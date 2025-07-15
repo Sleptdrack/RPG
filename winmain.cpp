@@ -1,5 +1,3 @@
-#include <TGUI/TGUI.hpp>
-#include <TGUI/Backend/SFML-Graphics.hpp>
 #include <SFML/Graphics.hpp>
 #include "Controller.h"
 
