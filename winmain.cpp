@@ -4,29 +4,23 @@
 int main(){
     Controller::SettingsView::SetupTab();
     Controller::TitleView::SetupMenu();
-    Controller::Window::View View=Controller::Window::Title;
     sf::RenderWindow window(sf::VideoMode({ Controller::Window::X, Controller::Window::Y }), "RPG");
+    window.setPosition({ 0,0 });
     while (window.isOpen())
     {
         while (const std::optional event = window.pollEvent())
         {
             if (event->is<sf::Event::Closed>())
                 window.close();
-        }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Tab)) {
-            while (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Tab));
-            if (View == Controller::Window::Title) {
-                View = Controller::Window::Settings;
-            }
-            else if (View == Controller::Window::Settings) {
-                View = Controller::Window::Title;
+            if (event->is<sf::Event::Resized>()) {
+                window.setView(Controller::SettingsView::View);
             }
         }
         window.clear();
-        switch (View) {
+        switch (Controller::Window::currentView) {
         case Controller::Window::Title:
             window.setView(Controller::TitleView::View);
-            Controller::TitleView::HandleEvent(View, window);
+            Controller::TitleView::HandleEvent(Controller::Window::currentView, window);
             Controller::TitleView::draw(window);
             break;
         case Controller::Window::Settings:
@@ -34,7 +28,8 @@ int main(){
             if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
                 Controller::SettingsView::ActiveTab(window);
             }
-            Controller::SettingsView::DrawTab(window);
+            Controller::SettingsView::resolution.handleEvent(window);
+            Controller::SettingsView::Draw(window);
             break;
         case Controller::Window::Game:
             break;
