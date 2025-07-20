@@ -2,38 +2,38 @@
 #include "Controller.h"
 
 int main(){
-    Controller::SettingsView::SetupTab();
+    Controller::SettingsView::Setup();
     Controller::TitleView::SetupMenu();
-    sf::RenderWindow window(sf::VideoMode({ Controller::Window::X, Controller::Window::Y }), "RPG");
-    window.setPosition({ 0,0 });
-    while (window.isOpen())
+    Controller::Window::Setup();
+    Controller::GameView::Setup();
+    while (Controller::Window::window.isOpen())
     {
-        while (const std::optional event = window.pollEvent())
+        while (const std::optional event = Controller::Window::window.pollEvent())
         {
             if (event->is<sf::Event::Closed>())
-                window.close();
+                Controller::Window::window.close();
             if (event->is<sf::Event::Resized>()) {
-                window.setView(Controller::SettingsView::View);
+                Controller::Window::window.setView(Controller::SettingsView::View);
             }
         }
-        window.clear();
+        Controller::Window::window.clear();
         switch (Controller::Window::currentView) {
         case Controller::Window::Title:
-            window.setView(Controller::TitleView::View);
-            Controller::TitleView::HandleEvent(Controller::Window::currentView, window);
-            Controller::TitleView::draw(window);
+            Controller::Window::window.setView(Controller::TitleView::View);
+            Controller::TitleView::HandleEvent(Controller::Window::currentView, Controller::Window::window);
+            Controller::TitleView::draw(Controller::Window::window);
             break;
         case Controller::Window::Settings:
-            window.setView(Controller::SettingsView::View);
-            if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
-                Controller::SettingsView::ActiveTab(window);
-            }
-            Controller::SettingsView::resolution.handleEvent(window);
-            Controller::SettingsView::Draw(window);
+            Controller::Window::window.setView(Controller::SettingsView::View);
+            Controller::SettingsView::HandleEvent();
+            Controller::SettingsView::Draw(Controller::Window::window);
             break;
         case Controller::Window::Game:
+            Controller::Window::window.setView(Controller::GameView::View);
+            Controller::GameView::HandleEvent();
+            Controller::GameView::Draw();
             break;
         }
-        window.display();
+        Controller::Window::window.display();
     }
 }

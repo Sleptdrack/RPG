@@ -1,5 +1,6 @@
 #include "Controller.h"
-void Controller::SettingsView::SetupTab(){
+void Controller::SettingsView::Setup(){
+	//Tabs setup
 	for (size_t i = 0; i < tabs.size(); ++i) {
 		tabLabels.push_back(sf::Text(Window::Font, tabNames[i], Window::textSize));
 	}
@@ -17,6 +18,8 @@ void Controller::SettingsView::SetupTab(){
 		tabLabels[i].setFillColor(sf::Color::Black);
 	};
 	tabs[activeTab].setFillColor(sf::Color(100, 100, 250));
+	//Video Setup
+	resolution.selectOption(1);//1920x1080;
 }
 
 void Controller::SettingsView::ActiveTab(sf::RenderWindow& rt){
@@ -27,6 +30,7 @@ void Controller::SettingsView::ActiveTab(sf::RenderWindow& rt){
 			tabs[activeTab].setFillColor(sf::Color(200, 200, 200));
 			activeTab = i;
 			tabs[activeTab].setFillColor(sf::Color(100, 100, 250));
+			page = Tab(activeTab-1);
 			break;
 		}
 	}
@@ -35,6 +39,22 @@ void Controller::SettingsView::ActiveTab(sf::RenderWindow& rt){
 		tabs[activeTab].setFillColor(sf::Color(200, 200, 200));
 		activeTab = 1;
 		tabs[activeTab].setFillColor(sf::Color(100, 100, 250));
+	}
+}
+
+void Controller::SettingsView::HandleEvent(){
+	sf::Vector2f mp = Window::window.mapPixelToCoords(sf::Mouse::getPosition(Window::window));
+	bool resize = false;
+	size_t t;
+	//Event if there is a left click
+	if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
+		while (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left));
+		ActiveTab(Window::window);
+		resolution.handleEvent(resize, t);
+	}
+	//Event if there is a resize
+	if (resize) {
+		Window::window.setSize(reso[t]);
 	}
 }
 
@@ -47,7 +67,16 @@ void Controller::SettingsView::DrawTab(sf::RenderTarget& rt){
 
 void Controller::SettingsView::Draw(sf::RenderTarget& rt){
 	DrawTab(rt);
-	resolution.draw(rt);
+	switch (page) {
+	case Tab::Video:
+		resolution.draw(rt);
+		break;
+	case Tab::Audio:
+		break;
+	case Tab::Controllers:
+		break;
+	}
+	
 }
 
 void Controller::TitleView::SetupMenu(){
@@ -78,6 +107,7 @@ void Controller::TitleView::draw(sf::RenderTarget& rt){
 }
 
 void Controller::TitleView::HandleEvent(Window::View& currentView, sf::RenderWindow& rw){
+	//If arrow are used
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up)) {
 		while (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up));
 		menuLabels[selected].setFillColor(sf::Color(200, 200, 200));
@@ -103,6 +133,30 @@ void Controller::TitleView::HandleEvent(Window::View& currentView, sf::RenderWin
 		case 3: // Exit Game
 			rw.close();
 			break;
+		}
+	}
+	//If mouse is used
+	sf::Vector2f mp = rw.mapPixelToCoords(sf::Mouse::getPosition(rw));
+	if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
+		while (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left));
+		for (size_t i = 0; i < menuLabels.size(); i++) {
+			if (menuLabels[i].getGlobalBounds().contains(mp)) {
+				menuLabels[selected].setFillColor(sf::Color(200, 200, 200));
+				selected = i;
+				menuLabels[selected].setFillColor(sf::Color(100, 100, 150));
+				switch (selected) {
+				case 0: // Start
+				case 1: // Start New Game
+					currentView = Window::Game;
+					break;
+				case 2: // Settings
+					currentView = Window::Settings;
+					break;
+				case 3: // Exit Game
+					rw.close();
+					break;
+				}
+			}
 		}
 	}
 }
@@ -140,26 +194,27 @@ Controller::Dropdown::Dropdown(string des, const vector<string>& items, sf::Vect
 	}
 }
 
-void Controller::Dropdown::handleEvent(sf::RenderWindow& window){
-	sf::Vector2f mp = window.mapPixelToCoords(sf::Mouse::getPosition(window));
-	if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
-		while (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left));
-		if (box.getGlobalBounds().contains({ (float)mp.x,(float)mp.y })) {
-			open = !open;
-			return;
-		}
-		if (open) {
-			for (size_t i = 0; i < optionBoxes.size(); ++i) {
-				if (optionBoxes[i].getGlobalBounds().contains({ (float)mp.x,(float)mp.y })) {
-					currentIndex = i;
-					currentOption.setString(option[i].getString());
-					//resize window
-					window.setSize(SettingsView::reso[i]);
-					Window::X = SettingsView::reso[i].x;
-					Window::Y = SettingsView::reso[i].y;
-					open = false;
-					break;
-				}
+void Controller::Dropdown::selectOption(int i){
+	currentIndex = i;
+	currentOption.setString(option[currentIndex].getString());
+}
+
+void Controller::Dropdown::handleEvent(bool& resize, size_t& j){
+	sf::Vector2f mp = Window::window.mapPixelToCoords(sf::Mouse::getPosition(Window::window));
+	if (box.getGlobalBounds().contains(mp)) {
+		open = !open;
+		resize = false;
+		return;
+	}
+	if (open) {
+		for (size_t i = 0; i < optionBoxes.size(); ++i) {
+			if (optionBoxes[i].getGlobalBounds().contains(mp)) {
+				currentIndex = i;
+				currentOption.setString(option[i].getString());
+				resize = true; //returns true if the user selects something
+				j = i;
+				open = false;
+				break;
 			}
 		}
 	}
@@ -175,5 +230,92 @@ void Controller::Dropdown::draw(sf::RenderTarget& rt){
 			rt.draw(optionBoxes[i]);
 			rt.draw(option[i]);
 		}
+	}
+}
+
+void Controller::Window::Setup(){
+	window.create(sf::VideoMode(), "RPG");
+	window.setSize({ X,Y });
+	window.setPosition({ 0,0 });
+}
+
+Controller::Mision::Mision(string name, string description){
+	//Setup mision name
+	Name.setCharacterSize(Window::textSize);
+	Name.setString(name);
+	Name.setFillColor(sf::Color::White);
+	//setup description
+	Description.setCharacterSize(Window::textSize);
+	Description.setString(description);
+	Description.setFillColor(sf::Color::White);
+}
+
+void Controller::Mision::Draw(){
+	Window::window.draw(Name);
+}
+
+void Controller::Mision::SetPos(sf::Vector2f pos){
+	Name.setPosition(pos);
+}
+
+void Controller::Mision::Open(){
+	//Open window to show description
+	//
+
+}
+
+void Controller::GameView::Setup(){
+	back.setPosition({ 0,0 });
+	back.setFillColor(sf::Color::White);
+	//Load mision probably from file
+	//for now 3 blankone
+	Mision mision1("Mision 1", "Insertar descripcion aqui que tan larga puede ser nose");
+	Mision mision2("Mision 2", "Insertar descripcion aqui que tan larga puede ser nose");
+	Mision mision3("Mision 3", "Insertar descripcion aqui que tan larga puede ser nose");
+	misions.push_back(mision1);
+	misions.push_back(mision2);
+	misions.push_back(mision3);
+	//Position  mision in screen
+	for (size_t i = 0; i < misions.size(); ++i) {
+		misions[i].SetPos({
+			Window::X / 2.f,
+			Window::Y / 4.f + static_cast<float>(i) * 80.f
+			});
+	}
+
+}
+
+void Controller::GameView::Draw(){
+	switch (scene) {
+	case Start:
+		Window::window.draw(back);
+		for (size_t i = 0; i < misions.size(); ++i) {
+			misions[i].Draw();
+		}
+		break;
+	case Equipment:
+		break;
+	case Game:
+		break;
+	}
+}
+
+void Controller::GameView::HandleEvent(){
+	sf::Vector2f mp = Window::window.mapPixelToCoords(sf::Mouse::getPosition(Window::window));
+	switch (scene) {
+	case Start:
+		if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
+			while (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left));
+			if (back.getGlobalBounds().contains(mp)) {
+				Window::currentView = Window::View::Title;
+			}
+		}
+		//Add method to open description
+		///
+		break;
+	case Equipment:
+		break;
+	case Game:
+		break;
 	}
 }
