@@ -13,6 +13,8 @@ namespace Controller {
 		static inline float ratio = 9.f / 16.f;
 		static inline unsigned int X = 1920, Y = (unsigned int)X * ratio;
 		static inline sf::RenderWindow window;
+		static inline unordered_map<sf::Keyboard::Key, string> KeyLabel;
+		static inline unordered_map<sf::Mouse::Button, string> MouseLabel;
 		enum View {
 			Title = 0,
 			Settings = 1,
@@ -21,6 +23,10 @@ namespace Controller {
 		static inline View currentView = View::Title;
 	public:
 		static void Setup();
+		static string keyToString(sf::Keyboard::Key key);
+		static sf::Keyboard::Key StringToKey(string s);
+		static string clickToString(sf::Mouse::Button click);
+		static sf::Mouse::Button StringToClick(string s);
 	};
 	class Dropdown {
 	public:
@@ -36,6 +42,22 @@ namespace Controller {
 		void selectOption(int i);
 		void handleEvent(bool& resize, size_t& j);
 		void draw(sf::RenderTarget& rt);
+	};
+	class Slider {
+	public:
+		sf::RectangleShape bar;
+		sf::RectangleShape thumb;
+		sf::Text valueText = sf::Text(Window::Font,"",Window::textSize);
+		sf::Text description = sf::Text(Window::Font, "", Window::textSize);
+		int value;
+		bool dragging;
+	public:
+		Slider(string s,sf::Vector2f position, sf::Vector2f size);
+		void HandleEvent();
+		void setValue(int v);
+		void updateText();
+		int getValue();
+		void Draw();
 	};
 	class IView {
 	public:
@@ -76,6 +98,8 @@ namespace Controller {
 		static inline float tabWidth = (float)Window::X / tabs.size();
 		static inline float tabHeight = 40.f;
 		static inline int activeTab = 1;
+		static inline bool click = false;
+		static inline bool click1 = false;
 		//switch between tabs
 		enum Tab {
 			Video,
@@ -87,11 +111,39 @@ namespace Controller {
 		static inline vector<string> res = { "2560x1440","1920x1080","1280x720" };
 		static inline vector<sf::Vector2u> reso = { {2560,1440},{1920,1080},{1280,720} };
 		static inline Dropdown resolution = Dropdown("Resolution: ",res, {Window::X / 4.f,Window::Y / 4.f}, {200,40});
+		//Audio tab
+		static inline Slider Music1 = Slider("Music",{ Window::X / 4.f, Window::Y / 4.f }, {500,20});
+		//Controller tab
+		static inline vector<string> textDes = {
+			"Move Forward",
+			"Move Backward",
+			"Move Right",
+			"Move Left",
+			"Primary Attack",
+			"Secundary Attack",
+			"Dodge",
+			"Interact" };
+		static inline vector<string> textKey = {
+			"W",
+			"S",
+			"D",
+			"S",
+			"Left click",
+			"Right click",
+			"Space bar",
+			"E" };
+		static inline vector<sf::Text> Description;
+		static inline vector<sf::Text> Key;
+		static inline bool changing = false;
+		static inline size_t index = 0;
 	public:
 		static void Setup();
 		static void ActiveTab(sf::RenderWindow& rt);
+		static void changeKey();
+		static void updateKey(string s);
 		static void HandleEvent();
 		static void DrawTab(sf::RenderTarget& rt);
+		static void DrawController();
 		static void Draw(sf::RenderTarget& rt);
 	};
 	class GameView : public IView {

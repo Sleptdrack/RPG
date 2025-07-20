@@ -20,6 +20,26 @@ void Controller::SettingsView::Setup(){
 	tabs[activeTab].setFillColor(sf::Color(100, 100, 250));
 	//Video Setup
 	resolution.selectOption(1);//1920x1080;
+	//Audio Setup
+
+	//Controller Setup
+	for (size_t i = 0; i < textDes.size(); ++i) {
+		Description.push_back(sf::Text(Window::Font, textDes[i], Window::textSize));
+		Key.push_back(sf::Text(Window::Font, textKey[i], Window::textSize));
+	}
+	for (size_t i = 0; i < textDes.size(); ++i) {
+		sf::FloatRect tb = Description[i].getGlobalBounds();
+		Description[i].setFillColor(sf::Color::White);
+		Description[i].setPosition({
+			(float)Window::X/3.f,
+			i * ((float)Window::Y / textDes.size()-20) + Window::Y/10
+			});
+		Key[i].setFillColor(sf::Color::White);
+		Key[i].setPosition({
+			2.f* (float)Window::X/3.f,
+			i* ((float)Window::Y / textDes.size() - 20) + Window::Y / 10
+			});
+	}
 }
 
 void Controller::SettingsView::ActiveTab(sf::RenderWindow& rt){
@@ -42,19 +62,42 @@ void Controller::SettingsView::ActiveTab(sf::RenderWindow& rt){
 	}
 }
 
+void Controller::SettingsView::changeKey(){
+	sf::Vector2f mp = Window::window.mapPixelToCoords(sf::Mouse::getPosition(Window::window));
+	for (size_t i = 0; i < Key.size(); ++i) {
+		if (Key[i].getGlobalBounds().contains(mp)) {
+			changing = true;
+			index = i;
+			Key[index].setFillColor(sf::Color::Cyan);
+		}
+	}
+}
+
+void Controller::SettingsView::updateKey(string s){
+	Key[index].setString(s);
+	Key[index].setFillColor(sf::Color::White);
+	changing = false;
+	//Update key in player
+}
+
 void Controller::SettingsView::HandleEvent(){
 	sf::Vector2f mp = Window::window.mapPixelToCoords(sf::Mouse::getPosition(Window::window));
 	bool resize = false;
 	size_t t;
 	//Event if there is a left click
-	if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
-		while (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left));
+	if (click) {
 		ActiveTab(Window::window);
-		resolution.handleEvent(resize, t);
+		if (page == Tab::Video)resolution.handleEvent(resize, t);
+		if (page == Tab::Controllers)changeKey();
+		click = false;
 	}
 	//Event if there is a resize
 	if (resize) {
 		Window::window.setSize(reso[t]);
+	}
+	if (page == Tab::Audio) {
+		Music1.setValue(Music1.getValue());
+		Music1.HandleEvent();
 	}
 }
 
@@ -65,6 +108,13 @@ void Controller::SettingsView::DrawTab(sf::RenderTarget& rt){
 	}
 }
 
+void Controller::SettingsView::DrawController() {
+	for (size_t i = 0; i < textDes.size(); ++i) {
+		Window::window.draw(Description[i]);
+		Window::window.draw(Key[i]);
+	}
+}
+
 void Controller::SettingsView::Draw(sf::RenderTarget& rt){
 	DrawTab(rt);
 	switch (page) {
@@ -72,8 +122,10 @@ void Controller::SettingsView::Draw(sf::RenderTarget& rt){
 		resolution.draw(rt);
 		break;
 	case Tab::Audio:
+		Music1.Draw();
 		break;
 	case Tab::Controllers:
+		DrawController();
 		break;
 	}
 	
@@ -237,6 +289,70 @@ void Controller::Window::Setup(){
 	window.create(sf::VideoMode(), "RPG");
 	window.setSize({ X,Y });
 	window.setPosition({ 0,0 });
+
+	KeyLabel = {
+		{sf::Keyboard::Key::A, "A"},{sf::Keyboard::Key::B, "B"},{sf::Keyboard::Key::C, "C"},
+		{sf::Keyboard::Key::D, "D"},{sf::Keyboard::Key::E, "E"},{sf::Keyboard::Key::F, "F"},
+		{sf::Keyboard::Key::G, "G"},{sf::Keyboard::Key::H, "H"},{sf::Keyboard::Key::I, "I"},
+		{sf::Keyboard::Key::J, "J"},{sf::Keyboard::Key::K, "K"},{sf::Keyboard::Key::L, "L"},
+		{sf::Keyboard::Key::M, "M"},{sf::Keyboard::Key::N, "N"},{sf::Keyboard::Key::O, "O"},
+		{sf::Keyboard::Key::P, "P"},{sf::Keyboard::Key::Q, "Q"},{sf::Keyboard::Key::R, "R"},
+		{sf::Keyboard::Key::S, "S"},{sf::Keyboard::Key::T, "T"},{sf::Keyboard::Key::U, "U"},
+		{sf::Keyboard::Key::V, "V"},{sf::Keyboard::Key::W, "W"},{sf::Keyboard::Key::X, "X"},
+		{sf::Keyboard::Key::Y, "Y"},{sf::Keyboard::Key::Z, "Z"},
+
+		{sf::Keyboard::Key::Num0, "0"},{sf::Keyboard::Key::Num1, "1"},
+		{sf::Keyboard::Key::Num2, "2"},{sf::Keyboard::Key::Num3, "3"},
+		{sf::Keyboard::Key::Num4, "4"},{sf::Keyboard::Key::Num5, "5"},
+		{sf::Keyboard::Key::Num6, "6"},{sf::Keyboard::Key::Num7, "7"},
+		{sf::Keyboard::Key::Num8, "8"},{sf::Keyboard::Key::Num9, "9"},
+
+		{sf::Keyboard::Key::Escape,   "Escape"},
+		{sf::Keyboard::Key::LControl, "LControl"},{sf::Keyboard::Key::RControl, "RControl"},
+		{sf::Keyboard::Key::LShift,   "LShift"  },{sf::Keyboard::Key::RShift,   "RShift"  },
+		{sf::Keyboard::Key::LAlt,     "LAlt"    },{sf::Keyboard::Key::RAlt,     "RAlt"    },
+		{sf::Keyboard::Key::Space,    "Space"},
+		{sf::Keyboard::Key::Enter,    "Enter"},
+		{sf::Keyboard::Key::Tab,      "Tab"},
+		{sf::Keyboard::Key::Backspace,"Backspace"},
+
+		{sf::Keyboard::Key::Left,  "Left"},
+		{sf::Keyboard::Key::Right, "Right"},
+		{sf::Keyboard::Key::Up,    "Up"},
+		{sf::Keyboard::Key::Down,  "Down"},
+	};
+
+	MouseLabel = {
+		{sf::Mouse::Button::Left, "Left Click"},{sf::Mouse::Button::Right,"Right Click"},{sf::Mouse::Button::Middle, "Middle Click"},
+	};
+}
+
+string Controller::Window::keyToString(sf::Keyboard::Key key){
+	auto it = KeyLabel.find(key);
+	return it != KeyLabel.end()? it->second : "Error";
+}
+
+sf::Keyboard::Key Controller::Window::StringToKey(string s)
+{
+	for (auto it : KeyLabel) {
+		if (it.second == s) {
+			return it.first;
+		}
+	}
+}
+
+string Controller::Window::clickToString(sf::Mouse::Button click){
+	auto it = MouseLabel.find(click);
+	return it != MouseLabel.end() ? it->second : "Error";
+}
+
+sf::Mouse::Button Controller::Window::StringToClick(string s)
+{
+	for (auto it : MouseLabel) {
+		if (it.second == s) {
+			return it.first;
+		}
+	}
 }
 
 Controller::Mision::Mision(string name, string description){
@@ -318,4 +434,71 @@ void Controller::GameView::HandleEvent(){
 	case Game:
 		break;
 	}
+}
+
+Controller::Slider::Slider(string s,sf::Vector2f position, sf::Vector2f size) {
+	value = 0;
+	dragging = false;
+	//bar setup
+	bar.setSize(size);
+	bar.setPosition(position);
+	bar.setFillColor(sf::Color({ 200,200,200 }));
+	bar.setOutlineColor(sf::Color::Black);
+	bar.setOutlineThickness(1.f);
+	//thumb
+	thumb.setSize({ size.y,size.y });
+	thumb.setFillColor({ 100,100,250 });
+	setValue(0);
+	//text
+	valueText.setCharacterSize(18);
+	valueText.setFillColor(sf::Color::White);
+	valueText.setPosition(position - sf::Vector2f({ 25, 0 }));
+	//Description
+	description.setString(s);
+	description.setFillColor(sf::Color::White);
+	description.setPosition(valueText.getPosition() - sf::Vector2f({ description.getGlobalBounds().size.x + 10,15.f }));
+}
+
+void Controller::Slider::HandleEvent(){
+	sf::Vector2f mp = Window::window.mapPixelToCoords(sf::Mouse::getPosition(Window::window));
+	if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
+		if (thumb.getGlobalBounds().contains(mp)) {
+			dragging = true;
+		}
+	}
+	else if (!sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
+		dragging = false;
+	}
+	if (dragging && sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
+		float x = mp.x - thumb.getSize().x / 2.f;
+		float minX = bar.getPosition().x;
+		float maxX = bar.getPosition().x + bar.getSize().x - thumb.getSize().x;
+		x = std::clamp(x, minX, maxX);
+		thumb.setPosition({ x, bar.getPosition().y });
+		updateText();
+	}
+}
+
+void Controller::Slider::setValue(int v){
+	v = std::clamp(v, 0, 100);
+	float ratio = v / 100.f;
+	float x = bar.getPosition().x + ratio * (bar.getSize().x - thumb.getSize().x);
+	thumb.setPosition({ x, bar.getPosition().y });
+	updateText();
+}
+
+void Controller::Slider::updateText(){
+	valueText.setString(std::to_string(getValue()));
+}
+
+int Controller::Slider::getValue(){
+	value = ((thumb.getPosition().x - bar.getPosition().x) / (bar.getSize().x - thumb.getSize().x) * 100 + 0.5f);
+	return value;
+}
+
+void Controller::Slider::Draw(){
+	Window::window.draw(bar);
+	Window::window.draw(thumb);
+	Window::window.draw(valueText);
+	Window::window.draw(description);
 }
