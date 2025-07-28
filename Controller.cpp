@@ -1,4 +1,5 @@
-#include "Controller.h"
+﻿#include "Controller.h"
+using namespace msclr::interop;
 void Controller::SettingsView::Setup(){
 	//Tabs setup
 	for (size_t i = 0; i < tabs.size(); ++i) {
@@ -40,6 +41,7 @@ void Controller::SettingsView::Setup(){
 			i* ((float)Window::Y / textDes.size() - 20) + Window::Y / 10
 			});
 	}
+	Load();
 }
 
 void Controller::SettingsView::ActiveTab(sf::RenderWindow& rt){
@@ -77,23 +79,37 @@ void Controller::SettingsView::updateKey(string s){
 	Key[index].setString(s);
 	Key[index].setFillColor(sf::Color::White);
 	changing = false;
+	Save();
 	//Update key in player
 }
 
 void Controller::SettingsView::HandleEvent(){
-	sf::Vector2f mp = Window::window.mapPixelToCoords(sf::Mouse::getPosition(Window::window));
 	bool resize = false;
 	size_t t;
 	//Event if there is a left click
 	if (click) {
 		ActiveTab(Window::window);
-		if (page == Tab::Video)resolution.handleEvent(resize, t);
-		if (page == Tab::Controllers)changeKey();
+		if (page == Tab::Video) {
+			resolution.handleEvent(resize, t);
+		}
+		if (page == Tab::Controllers){
+			changeKey();
+		}
 		click = false;
+	}
+	if (changing) {
+		if (Window::keypressed) {
+			updateKey(Window::keyToString(Keycode));
+			Window::keypressed = false;
+		}
+		if (Window::mousepressed) {
+			updateKey(Window::clickToString(Mousecode));
+			Window::mousepressed = false;
+		}
 	}
 	//Event if there is a resize
 	if (resize) {
-		Window::window.setSize(reso[t]);
+		Window::resize(reso[t]);
 	}
 	if (page == Tab::Audio) {
 		Music1.setValue(Music1.getValue());
@@ -129,6 +145,40 @@ void Controller::SettingsView::Draw(sf::RenderTarget& rt){
 		break;
 	}
 	
+}
+
+void Controller::SettingsView::Save(){
+	DB^ model = gcnew DB();
+
+	model->resolutionIndex = resolution.currentIndex;
+	model->musicValue = Music1.getValue();
+	int count = static_cast<int>(Key.size());
+	model->keyBindings = gcnew List<System::String^>();
+	for (size_t i = 0; i < Key.size(); ++i) {
+		string s = Key[i].getString();
+		model->keyBindings->Add(marshal_as<System::String^>(s));
+	}
+
+	System::IO::Stream^ stream = System::IO::File::Open("Settings.bin", System::IO::FileMode::Create);
+	BinaryFormatter^ bFormatter = gcnew BinaryFormatter();
+	bFormatter->Serialize(stream, model);
+	stream->Close();
+}
+
+void Controller::SettingsView::Load(){
+	if (!File::Exists("Settings.bin")) return;
+	Stream^ stream = File::Open("Settings.bin", FileMode::Open);
+	BinaryFormatter^ bFormatter = gcnew BinaryFormatter();
+	DB^ model = (DB^)bFormatter->Deserialize(stream);
+	stream->Close();
+
+	resolution.selectOption(model->resolutionIndex);
+	Window::resize(reso[model->resolutionIndex]);
+	Music1.setValue(model->musicValue);
+	for (int i = 0; i < textKey.size(); ++i) {
+		string s = marshal_as<string>(model->keyBindings[i]);
+		Key[i].setString(s);
+	}
 }
 
 void Controller::TitleView::SetupMenu(){
@@ -205,6 +255,7 @@ void Controller::TitleView::HandleEvent(Window::View& currentView, sf::RenderWin
 					currentView = Window::Settings;
 					break;
 				case 3: // Exit Game
+					SettingsView::Save();
 					rw.close();
 					break;
 				}
@@ -286,8 +337,9 @@ void Controller::Dropdown::draw(sf::RenderTarget& rt){
 }
 
 void Controller::Window::Setup(){
+	clock.restart();
 	window.create(sf::VideoMode(), "RPG");
-	window.setSize({ X,Y });
+	window.setSize(SettingsView::reso[SettingsView::resolution.currentIndex]);
 	window.setPosition({ 0,0 });
 
 	KeyLabel = {
@@ -327,6 +379,55 @@ void Controller::Window::Setup(){
 	};
 }
 
+void Controller::Window::HandleEvent(){
+	bool click = false;
+	Window::window.handleEvents(
+		[&](const sf::Event::Closed) {
+			window.close();
+		},
+		[&](const sf::Event::Resized) {
+			window.setView(SettingsView::View);
+		},
+		[&](const sf::Event::MouseButtonPressed& key) {
+			if (SettingsView::changing) {
+				SettingsView::Mousecode = key.button;
+				mousepressed = true;
+			}
+			if (key.button == sf::Mouse::Button::Left && !clickstate) {
+				clickstate = true;
+			}
+		},
+		[&](const sf::Event::MouseButtonReleased& key) {
+			if (key.button == sf::Mouse::Button::Left && clickstate) {
+				clickstate = false;
+				click = true;
+			}
+		},
+		[&](const sf::Event::KeyPressed& key) {
+			if (SettingsView::changing) {
+				SettingsView::Keycode = key.code;
+				keypressed = true;
+			}
+		}
+	);
+	if (click) {
+		switch (currentView) {
+		case Title:
+			break;
+		case Settings:
+			SettingsView::click = true;
+			break;
+		case Game:
+			GameView::click = true;
+			break;
+		}
+	}
+}
+
+void Controller::Window::resize(sf::Vector2u u){
+	window.setSize(u);
+}
+
 string Controller::Window::keyToString(sf::Keyboard::Key key){
 	auto it = KeyLabel.find(key);
 	return it != KeyLabel.end()? it->second : "Error";
@@ -355,29 +456,124 @@ sf::Mouse::Button Controller::Window::StringToClick(string s)
 	}
 }
 
-Controller::Mision::Mision(string name, string description){
+bool Controller::Window::Click(){
+	bool n = false;
+	Window::window.handleEvents(
+		[&](const sf::Event::MouseButtonPressed& key) {
+			if (key.button == sf::Mouse::Button::Left && !clickstate) {
+				clickstate = true;
+			}
+		},
+		[&](const sf::Event::MouseButtonReleased& key) {
+			if (key.button == sf::Mouse::Button::Left && clickstate) {
+				clickstate = false;
+				n = true;
+			}
+		}
+	);
+	return n;
+}
+
+Controller::Mision::Mision(string name, string description) {
 	//Setup mision name
 	Name.setCharacterSize(Window::textSize);
 	Name.setString(name);
 	Name.setFillColor(sf::Color::White);
+	//Background panel
+	rec.setFillColor(sf::Color({30,30,30}));
+	rec.setSize({ 400,400 });
 	//setup description
 	Description.setCharacterSize(Window::textSize);
-	Description.setString(description);
+	vector<string> lines = wrapText(description, rec.getSize().x - 20.f);
+	ostringstream oss;
+	for (auto& l : lines)oss << l << "\n";
+	Description.setString(oss.str());
 	Description.setFillColor(sf::Color::White);
+	//Accept Button
+	acceptButton.setSize({
+		rec.getSize().x * 0.5f,
+		40.f
+		});
+	acceptButton.setPosition({
+		(rec.getSize().x - acceptButton.getSize().x) / 2.f,
+		rec.getSize().y - acceptButton.getSize().y - 10.f
+		});
+	acceptButton.setFillColor(sf::Color({ 70,130,180 }));
+	acceptLabel.setFillColor(sf::Color::White);
+	centerLabel(acceptLabel, acceptButton.getGlobalBounds());
+	SetDesPos({ Window::X / 2.f, Window::Y / 3.f });
+}
+
+void Controller::Mision::centerLabel(sf::Text& txt, const sf::FloatRect rect){
+	sf::FloatRect tb = txt.getLocalBounds();
+	txt.setOrigin(tb.getCenter());
+	txt.setPosition(rect.getCenter());
+}
+
+std::vector<string> Controller::Mision::wrapText(string s, float maxWidth){
+	istringstream words(s);
+	vector<string> lines;
+	string word, line;
+	while (words >> word) {
+		string test = line.empty() ? word : line + " " + word;
+		Description.setString(test);
+		if (Description.getGlobalBounds().size.x > maxWidth) {
+			if (!line.empty()) {
+				lines.push_back(line);
+				line = word;
+			}
+			else {
+				lines.push_back(test);
+				line.clear();
+			}
+		}
+		else {
+			line = test;
+		}
+	}
+	if (!line.empty())lines.push_back(line);
+	return lines;
 }
 
 void Controller::Mision::Draw(){
 	Window::window.draw(Name);
+	if (open) {
+		Window::window.draw(rec);
+		Window::window.draw(Description);
+		Window::window.draw(acceptButton);
+		Window::window.draw(acceptLabel);
+	}
 }
 
 void Controller::Mision::SetPos(sf::Vector2f pos){
 	Name.setPosition(pos);
 }
 
-void Controller::Mision::Open(){
-	//Open window to show description
-	//
+void Controller::Mision::SetDesPos(sf::Vector2f pos){
+	rec.setPosition(pos);
+	Description.setPosition(pos + sf::Vector2f({ 10,10 }));
+	acceptButton.setPosition({
+		pos.x + (rec.getSize().x * 0.5f) / 2.f,
+		pos.y + rec.getSize().y - acceptButton.getSize().y - 10.f
+		});
+	centerLabel(acceptLabel, acceptButton.getGlobalBounds());
+}
 
+bool Controller::Mision::Open(sf::Vector2f mp){
+	if (Name.getGlobalBounds().contains(mp)) {
+		return true;
+	}
+	return open;
+
+}
+
+bool Controller::Mision::Accept(sf::Vector2f mp){
+	if (acceptButton.getGlobalBounds().contains(mp)) {
+		return true;
+	}
+	else {
+		return false;
+	}
 }
 
 void Controller::GameView::Setup(){
@@ -394,7 +590,7 @@ void Controller::GameView::Setup(){
 	//Position  mision in screen
 	for (size_t i = 0; i < misions.size(); ++i) {
 		misions[i].SetPos({
-			Window::X / 2.f,
+			Window::X / 4.f,
 			Window::Y / 4.f + static_cast<float>(i) * 80.f
 			});
 	}
@@ -412,6 +608,7 @@ void Controller::GameView::Draw(){
 	case Equipment:
 		break;
 	case Game:
+		p.Draw();
 		break;
 	}
 }
@@ -420,18 +617,32 @@ void Controller::GameView::HandleEvent(){
 	sf::Vector2f mp = Window::window.mapPixelToCoords(sf::Mouse::getPosition(Window::window));
 	switch (scene) {
 	case Start:
-		if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
-			while (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left));
+		if (click) {
 			if (back.getGlobalBounds().contains(mp)) {
 				Window::currentView = Window::View::Title;
 			}
+			for (size_t i = 0; i < misions.size(); ++i) {
+				if (misions[i].Open(mp)) {
+					misions[selectedMision].Name.setFillColor(sf::Color::White);
+					misions[selectedMision].open = false;
+					selectedMision = i;
+					misions[selectedMision].Name.setFillColor(sf::Color::Cyan);
+					misions[selectedMision].open = true;
+				}
+			}
+			if(misions[selectedMision].Accept(mp)){
+				//set objective
+				//later send to equiment screen
+				//skiping this for now
+				scene = Screen::Game;
+			}
+			click = false;
 		}
-		//Add method to open description
-		///
 		break;
 	case Equipment:
 		break;
 	case Game:
+		p.move();
 		break;
 	}
 }
@@ -501,4 +712,118 @@ void Controller::Slider::Draw(){
 	Window::window.draw(thumb);
 	Window::window.draw(valueText);
 	Window::window.draw(description);
+}
+
+Controller::Animation::Animation(string s, sf::Vector2i pos, sf::Vector2i size){
+	if (!texture.loadFromFile(s)) return;
+	for (int i = 0; i < nFrames; i++) {
+		frames[i] = sf::IntRect({ pos.x + i * size.x,pos.y }, size);
+	}
+}
+
+void Controller::Animation::Update(float dt){
+	time += dt;
+	while (time >= holdTime) {
+		time -= holdTime;
+		Advance();
+	}
+}
+
+void Controller::Animation::Advance(){
+	if (++iFrame >= nFrames) {
+		iFrame = 0;
+	}
+}
+
+Controller::Player::Player(){
+	Health = 500;
+	position = sf::Vector2f({ Window::X / 2.f,Window::Y / 2.f });
+	Speed = 150;
+	Exp = 0;
+	Level = 0;
+	a1 = Animation("./External/PLACEHOLDERS/KASS-STB.png", { 0,0 },{500,{500}});
+	tex.loadFromFile("./External/PLACEHOLDERS/KASS-STB.png");
+	ds = DirectionalSprite(tex);
+	ds.setScale({ 0.1f,0.1f });
+}
+
+void Controller::Player::move(){
+	sf::Vector2f vel[4] = { {0,0}, {0,0}, {0,0}, {0,0} }, velo = { 0,0 };
+	if (sf::Keyboard::isKeyPressed(Window::StringToKey(SettingsView::Key[0].getString()))){
+		//asuming movement is only keys
+		vel[0] = { 0,-1 };
+		}
+	if (sf::Keyboard::isKeyPressed(Window::StringToKey(SettingsView::Key[1].getString()))) {
+		//asuming movement is only keys
+		vel[1] = { 0,1 };
+	}
+	if (sf::Keyboard::isKeyPressed(Window::StringToKey(SettingsView::Key[2].getString()))) {
+		//asuming movement is only keys
+		vel[2] = { 1,0 };
+	}
+	if (sf::Keyboard::isKeyPressed(Window::StringToKey(SettingsView::Key[3].getString()))) {
+		//asuming movement is only keys
+		vel[3] = { -1,0 };
+	}
+	velo = vel[0] + vel[1] + vel[2] + vel[3];
+	ds.fromVector(velo);
+	sf::Time t1 = Window::clock.getElapsedTime();
+	position += Speed * t1.asSeconds() * velo ;
+	ds.setPosition(position);
+	Window::clock.restart();
+}
+
+void Controller::Player::Draw(){
+	//animation
+	ds.draw();
+}
+
+Controller::DirectionalSprite::DirectionalSprite(sf::Texture& tex){
+	sprite.setTexture(tex);
+	auto ts = tex.getSize();
+	cols = 4; rows = 2;
+	frameW = ts.x / cols;
+	frameH = ts.y / rows;
+
+	static const std::array<std::pair<int, int>, 8> sheetPos = { {
+		{0,0},//W
+		{1,0},//SW
+		{2,0},//S
+		{3,0},//SE
+		{0,1},//E
+		{1,1},//NE
+		{2,1},//N
+		{3,1},//NW
+		}};
+
+	for (int i = 0; i < 8; ++i) {
+		auto [c, r] = sheetPos[i];
+		rects[Dir(i)] = sf::IntRect(
+			{ c * frameW,r * frameH },
+			{ frameW,frameH }
+		);
+	}
+	setDirection(Dir::S);
+}
+
+void Controller::DirectionalSprite::setDirection(Dir d){
+	sprite.setTextureRect(rects[d]);
+	current = d;
+}
+void Controller::DirectionalSprite::fromVector(const sf::Vector2f& v){
+	if (v.x < 0) {
+		if (v.y < 0) current = Dir::NW;
+		else if (v.y > 0) current = Dir::SW;
+		else current = Dir::W;
+	}
+	else if (v.x > 0) {
+		if (v.y < 0) current = Dir::NE;
+		else if (v.y > 0) current = Dir::SE;
+		else current = Dir::E;
+	}
+	else {
+		if (v.y < 0) current = Dir::N;
+		else current = Dir::S;
+	}
+	setDirection(current);
 }
