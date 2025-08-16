@@ -5,8 +5,9 @@
 #include <array>
 #include <string>
 #include <sstream>
+#include <cstdlib>
 #include <SFML/Graphics.hpp>
-
+#include "weapons.h"
 #using <mscorlib.dll>
 #include <msclr/marshal_cppstd.h>
 #using <System.dll>
@@ -30,6 +31,10 @@ namespace Controller {
 		static inline unordered_map<sf::Mouse::Button, string> MouseLabel;
 		static inline bool mousepressed = false;
 		static inline bool keypressed = false;
+		static inline bool primary = false;
+		static inline bool secundary = false;
+		static inline bool dash = false;
+		static inline bool interact = false;
 		enum View {
 			Title = 0,
 			Settings = 1,
@@ -78,6 +83,43 @@ namespace Controller {
 		int getValue();
 		void Draw();
 	};
+	class Bar {
+	public:
+		int maxValue = 100;
+		int value = 100;
+		float pad;
+		sf::Vector2f bsize;
+		sf::RectangleShape back, fill;
+		sf::Text text = sf::Text(Window::Font);
+	public:
+		Bar(sf::Vector2f size = { 200.f,22.f }, float padding = 12.f);
+		void clamp() { value = std::clamp(value, 0, maxValue); }
+		void updateFill();
+		void setMax(int m) { maxValue = std::max(1, m); clamp(); updateFill();}
+		void setValue(int v) { value = v; clamp(); updateFill();}
+		void setPosition(sf::Vector2f pos);
+		void update();
+		void draw();
+	};
+	class Timer {
+		sf::Clock time;
+		sf::Text timeText = sf::Text(Window::Font);
+	public:
+		Timer();
+		void update();
+		void restart();
+		void setPosition(sf::Vector2f pos);
+		void draw();
+	};
+	class Icon {
+	public:
+		sf::RectangleShape box;
+		sf::Text name = sf::Text(Window::Font);
+	public:
+		Icon(sf::Texture& s, string n);
+		void move(sf::Vector2f pos);
+		void draw();
+	};
 	/// <summary>
 	/// Animation + Player
 	/// </summary>
@@ -97,7 +139,7 @@ namespace Controller {
 	};
 	class DirectionalSprite {
 	public:
-		enum class Dir { W, SW, S, SE, E, NE, N, NW };
+		enum Dir { W, SW, S, SE, E, NE, N, NW };
 		sf::Texture t;
 		sf::Sprite sprite = sf::Sprite(t);
 		int cols, rows, frameW, frameH;
@@ -111,6 +153,7 @@ namespace Controller {
 		void draw() { Window::window.draw(sprite); };
 	};
 	public class Player {
+	public:
 		int Health;
 		sf::Vector2f position;
 		float Speed;
@@ -119,10 +162,16 @@ namespace Controller {
 		Animation a1;
 		sf::Texture tex;
 		DirectionalSprite ds = DirectionalSprite(tex);
+		sf::RectangleShape hitbox;
+		vector<std::unique_ptr<Weapons::Weapon>> weapon;
+		bool armed = false;
 	public:
 		Player();
+		sf::Vector2f getPosition();
 		void move();
 		void Draw();
+		void Aim(sf::Vector2f mp);
+		void Shoot();
 	};
 	[System::SerializableAttribute()]
 	public ref struct DB {
@@ -207,8 +256,8 @@ namespace Controller {
 			"S",
 			"D",
 			"S",
-			"Left click",
-			"Right click",
+			"Left Click",
+			"Right Click",
 			"Space bar",
 			"E" };
 		static inline vector<sf::Text> Description;
@@ -245,11 +294,29 @@ namespace Controller {
 			Game
 		};
 		static inline Screen scene = Screen::Start;
+		static inline Timer wave;
 		static inline Player p = Player();
+		static inline vector<Icon> action;
+		static inline vector<sf::Texture> actionT = {
+			sf::Texture("./External/PLACEHOLDERS/KASS-HOLO.png"),
+			sf::Texture("./External/PLACEHOLDERS/user.png"),
+			sf::Texture("./External/PLACEHOLDERS/user.png"),
+			sf::Texture("./External/PLACEHOLDERS/user.png")
+		};
+		static inline Bar Healthbar;
+		static inline sf::Texture mapT;
+		static inline sf::RectangleShape map;
+		static inline sf::View minimap = sf::View({ 1000,50 }, { 2000,2000 });
+		static inline vector<unique_ptr<Weapons::Weapon>> weapon;
 	public:
 		static void Setup();
+		static void UpdateAction(); 
+		static void Interact();
+		static void DrawAction();
+		static void DrawWeapon();
 		static void Draw();
 		static void HandleEvent();
+		static void UpdateView();
 	};
 }
 

@@ -380,6 +380,8 @@ void Controller::Window::Setup(){
 }
 
 void Controller::Window::HandleEvent(){
+	sf::Mouse::Button leftb = Window::StringToClick(SettingsView::textKey[4]);
+	sf::Mouse::Button rightb = Window::StringToClick(SettingsView::textKey[5]);
 	bool click = false;
 	Window::window.handleEvents(
 		[&](const sf::Event::Closed) {
@@ -396,6 +398,12 @@ void Controller::Window::HandleEvent(){
 			if (key.button == sf::Mouse::Button::Left && !clickstate) {
 				clickstate = true;
 			}
+			if (key.button == leftb && Window::currentView == Window::Game) {
+				primary = true;
+			}
+			if (key.button == rightb && Window::currentView == Window::Game) {
+				secundary = true;
+			}
 		},
 		[&](const sf::Event::MouseButtonReleased& key) {
 			if (key.button == sf::Mouse::Button::Left && clickstate) {
@@ -407,6 +415,12 @@ void Controller::Window::HandleEvent(){
 			if (SettingsView::changing) {
 				SettingsView::Keycode = key.code;
 				keypressed = true;
+			}
+			if (key.code == Window::StringToKey(SettingsView::textKey[6])) {
+				dash = true;
+			}
+			if (key.code == Window::StringToKey(SettingsView::textKey[7])) {
+				interact = true;
 			}
 		}
 	);
@@ -576,7 +590,7 @@ bool Controller::Mision::Accept(sf::Vector2f mp){
 	}
 }
 
-void Controller::GameView::Setup(){
+void Controller::GameView::Setup() {
 	back.setPosition({ 0,0 });
 	back.setFillColor(sf::Color::White);
 	//Load mision probably from file
@@ -594,7 +608,68 @@ void Controller::GameView::Setup(){
 			Window::Y / 4.f + static_cast<float>(i) * 80.f
 			});
 	}
+	mapT.loadFromFile("./External/PLACEHOLDERS/testmap.png");
+	map.setTexture(&mapT);
+	//Set starting point in map and proper scale, 
+	//map.setTextureRect(sf::IntRect({ mapT.getSize().x / 2.f,mapT.getSize().y / 2.f }, { 500,500 }));
+	//Set size and scale
+	map.setSize(sf::Vector2f({(float)Window::X, (float)Window::Y }));
+	map.setScale({ 8,8 });
+	//Set position, center in window
+	map.setOrigin({ Window::X / 2.f,Window::Y / 2.f });
+	map.setPosition({ Window::X / 2.f,Window::Y / 2.f });
+	//mini map
+	minimap.setViewport(sf::FloatRect({ 0,0.75f }, { 0.25f,0.25f }));
+	//Icons
+	for (int i = 0; i < 4; i++) {
+		Icon t(actionT[i], SettingsView::textKey[4 + i]);
+		action.push_back(t);
+	}
+	for (int i = 0; i < 4; i++) {
+		weapon.emplace_back(make_unique<Weapons::Pistol>());
+	}
+	for (auto& e : weapon) {
+		e->move({ (float)(rand() % Window::X),(float)(rand() % Window::Y) });
+	}
 
+}
+
+void Controller::GameView::UpdateAction(){
+	sf::Vector2f size = GameView::View.getSize();
+	sf::Vector2f center = GameView::View.getCenter();
+	sf::Vector2f pos = center + size * 0.5f - sf::Vector2f(600, 100);
+	for (size_t i = 0; i < action.size(); i++) {
+		action[i].move(pos + sf::Vector2f(i * 150, 0.f));
+	}
+}
+
+void Controller::GameView::Interact(){
+	sf::Vector2f mp = Window::window.mapPixelToCoords(sf::Mouse::getPosition(Window::window));
+	for (auto& e : weapon) {
+		if (Window::interact) {
+			if (p.hitbox.getGlobalBounds().findIntersection(e->gun.getGlobalBounds())) {
+				e->center = p.getPosition();
+				e->pickup = true;
+				p.weapon.push_back(move(e));
+				Window::interact = false;
+				p.armed = true;
+				
+			}
+		}
+	}
+	weapon.erase(remove(weapon.begin(), weapon.end(), nullptr), weapon.end());
+}
+
+void Controller::GameView::DrawAction(){
+	for (size_t i = 0; i < action.size(); i++) {
+		action[i].draw();
+	}
+}
+
+void Controller::GameView::DrawWeapon(){
+	for (auto& e : weapon) {
+		e->Draw(Controller::Window::window);
+	}
 }
 
 void Controller::GameView::Draw(){
@@ -608,6 +683,14 @@ void Controller::GameView::Draw(){
 	case Equipment:
 		break;
 	case Game:
+		Window::window.draw(map);
+		p.Draw();
+		Healthbar.draw();
+		wave.draw();
+		DrawAction();
+		DrawWeapon();
+		Window::window.setView(minimap);
+		Window::window.draw(map);
 		p.Draw();
 		break;
 	}
@@ -635,6 +718,7 @@ void Controller::GameView::HandleEvent(){
 				//later send to equiment screen
 				//skiping this for now
 				scene = Screen::Game;
+				wave.restart();
 			}
 			click = false;
 		}
@@ -642,9 +726,21 @@ void Controller::GameView::HandleEvent(){
 	case Equipment:
 		break;
 	case Game:
+		UpdateView();
+		wave.update();
+		UpdateAction();
+		Interact();
 		p.move();
+		p.Aim(mp);
+		p.Shoot();
+		Healthbar.update();
 		break;
 	}
+}
+
+void Controller::GameView::UpdateView(){
+	View.setCenter(p.getPosition());
+	minimap.setCenter(p.getPosition());
 }
 
 Controller::Slider::Slider(string s,sf::Vector2f position, sf::Vector2f size) {
@@ -745,6 +841,12 @@ Controller::Player::Player(){
 	tex.loadFromFile("./External/PLACEHOLDERS/KASS-STB.png");
 	ds = DirectionalSprite(tex);
 	ds.setScale({ 0.1f,0.1f });
+	hitbox.setSize({ 100,120 });
+	hitbox.setOrigin({ 50,60 });
+}
+
+sf::Vector2f Controller::Player::getPosition(){
+	return position;
 }
 
 void Controller::Player::move(){
@@ -770,12 +872,31 @@ void Controller::Player::move(){
 	sf::Time t1 = Window::clock.getElapsedTime();
 	position += Speed * t1.asSeconds() * velo ;
 	ds.setPosition(position);
+	hitbox.setPosition(position);
+	for (auto& e : weapon) e->move(position);
 	Window::clock.restart();
 }
 
 void Controller::Player::Draw(){
 	//animation
 	ds.draw();
+	if (armed) {
+		for (auto& e : weapon)e->Draw(Controller::Window::window);
+	}
+}
+
+
+void Controller::Player::Aim(sf::Vector2f mp){
+	for (auto& e : weapon) e->followMouse(mp);
+}
+
+void Controller::Player::Shoot(){
+	for (auto& e : weapon) {
+		if (Window::primary) {
+			e->primary();
+			Window::primary = false;
+		}
+	}
 }
 
 Controller::DirectionalSprite::DirectionalSprite(sf::Texture& tex){
@@ -784,7 +905,7 @@ Controller::DirectionalSprite::DirectionalSprite(sf::Texture& tex){
 	cols = 4; rows = 2;
 	frameW = ts.x / cols;
 	frameH = ts.y / rows;
-
+	
 	static const std::array<std::pair<int, int>, 8> sheetPos = { {
 		{0,0},//W
 		{1,0},//SW
@@ -804,6 +925,7 @@ Controller::DirectionalSprite::DirectionalSprite(sf::Texture& tex){
 		);
 	}
 	setDirection(Dir::S);
+	sprite.setOrigin(sf::Vector2f(sprite.getTextureRect().size) * 0.5f);
 }
 
 void Controller::DirectionalSprite::setDirection(Dir d){
@@ -826,4 +948,111 @@ void Controller::DirectionalSprite::fromVector(const sf::Vector2f& v){
 		else current = Dir::S;
 	}
 	setDirection(current);
+}
+
+Controller::Bar::Bar(sf::Vector2f size, float padding){
+	pad = padding;
+	bsize = size;
+	back.setSize(bsize);
+	back.setFillColor(sf::Color(30, 30, 30, 200));
+	back.setOutlineColor(sf::Color::White);
+	back.setOutlineThickness(2.f);
+
+	fill.setSize(bsize);
+	fill.setFillColor(sf::Color(200, 60, 60));
+
+	text.setFillColor(sf::Color::White);
+	text.setCharacterSize(16);
+}
+
+void Controller::Bar::updateFill(){
+	float ratio = (float)value / (float)maxValue;
+	ratio = std::clamp(ratio, 0.f, 1.f);
+	fill.setSize({ bsize.x * ratio,bsize.y });
+}
+
+void Controller::Bar::setPosition(sf::Vector2f pos){
+	back.setPosition(pos);
+	fill.setPosition(pos);
+}
+
+void Controller::Bar::update(){
+	sf::Vector2f size = GameView::View.getSize();
+	sf::Vector2f of = GameView::View.getCenter();
+	sf::Vector2f pos = sf::Vector2f(pad,pad)-size*0.5f+of;
+	setPosition(pos);
+
+	text.setString(std::to_string(value) + "/" + to_string(maxValue));
+	auto tb = text.getLocalBounds();
+	text.setPosition(
+		pos
+		+ sf::Vector2f(
+			bsize.x- tb.size.x-8.f,
+			(bsize.y - tb.size.y )* 0.5f-0.f)
+		//change 0 till look great
+	);
+	updateFill();
+}
+
+void Controller::Bar::draw() {
+	Window::window.draw(back);
+	Window::window.draw(fill);
+	Window::window.draw(text);
+}
+
+Controller::Timer::Timer(){
+	time.restart();
+	timeText.setFillColor(sf::Color::White);
+}
+void Controller::Timer::update() {
+	int t = time.getElapsedTime().asSeconds();
+	int min, sec;
+	min = t / 60;
+	sec = t % 60;
+	timeText.setString(
+		(min>=10?to_string(min):"0"+ to_string(min))
+		+ ":" +
+		(sec >= 10 ? to_string(sec) : "0" + to_string(sec))
+	);
+
+	sf::Vector2f size = GameView::View.getSize();
+	sf::Vector2f center = GameView::View.getCenter();
+	sf::Vector2f of = timeText.getLocalBounds().size;
+	sf::Vector2f pos = 
+		center + 
+		sf::Vector2f(size.x * 0.5f,-size.y*0.5f) - 
+		sf::Vector2f(of.x + 12.f,0.f);
+
+	setPosition(pos);
+
+}
+void Controller::Timer::restart(){
+	time.restart();
+}
+void Controller::Timer::setPosition(sf::Vector2f pos) {
+	timeText.setPosition(pos);
+}
+void Controller::Timer::draw() {
+	Window::window.draw(timeText);
+}
+
+Controller::Icon::Icon(sf::Texture& s, string n){
+	box.setSize({ 50.f,50.f });
+	box.setTexture(&s);
+	//sprite.setScale({ 0.1f,0.1f });
+	name.setFillColor(sf::Color::White);
+	name.setString(n);
+}
+
+void Controller::Icon::move(sf::Vector2f pos){
+	box.setPosition(pos);
+	sf::Vector2f size = box.getGlobalBounds().size;
+	name.setPosition(
+		pos +
+		sf::Vector2f(0,size.y+12.f)
+	);
+}
+void Controller::Icon::draw() {
+	Window::window.draw(box);
+	Window::window.draw(name);
 }
