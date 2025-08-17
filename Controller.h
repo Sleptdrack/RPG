@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <SFML/Graphics.hpp>
 #include "weapons.h"
+#include "Enemies.h"
 #using <mscorlib.dll>
 #include <msclr/marshal_cppstd.h>
 #using <System.dll>
@@ -25,7 +26,7 @@ namespace Controller {
 		static inline sf::Font Font = sf::Font("./External/Font/Mistral.ttf");
 		static inline int textSize = 30;
 		static inline float ratio = 9.f / 16.f;
-		static inline unsigned int X = 1920, Y = (unsigned int)X * ratio;
+		static inline unsigned int X = 1920, Y = static_cast<unsigned int>(X * ratio);
 		static inline sf::RenderWindow window;
 		static inline unordered_map<sf::Keyboard::Key, string> KeyLabel;
 		static inline unordered_map<sf::Mouse::Button, string> MouseLabel;
@@ -106,6 +107,7 @@ namespace Controller {
 		sf::Text timeText = sf::Text(Window::Font);
 	public:
 		Timer();
+		float gettime();
 		void update();
 		void restart();
 		void setPosition(sf::Vector2f pos);
@@ -165,6 +167,8 @@ namespace Controller {
 		sf::RectangleShape hitbox;
 		vector<std::unique_ptr<Weapons::Weapon>> weapon;
 		bool armed = false;
+		bool invulnerable = false;
+		sf::Clock Timer;
 	public:
 		Player();
 		sf::Vector2f getPosition();
@@ -284,7 +288,7 @@ namespace Controller {
 		static inline vector<Mision> misions;
 		static inline sf::Text back = sf::Text(Window::Font, "X", 30);
 		static inline bool click = false;
-		static inline int selectedMision = 0;
+		static inline size_t selectedMision = 0;
 		//Equipment scree
 
 		//Game screen
@@ -295,6 +299,7 @@ namespace Controller {
 		};
 		static inline Screen scene = Screen::Start;
 		static inline Timer wave;
+		static inline int spawnrate = 5;
 		static inline Player p = Player();
 		static inline vector<Icon> action;
 		static inline vector<sf::Texture> actionT = {
@@ -308,12 +313,17 @@ namespace Controller {
 		static inline sf::RectangleShape map;
 		static inline sf::View minimap = sf::View({ 1000,50 }, { 2000,2000 });
 		static inline vector<unique_ptr<Weapons::Weapon>> weapon;
+		static inline vector<unique_ptr<Enemies::Enemy>> enemy;
 	public:
 		static void Setup();
 		static void UpdateAction(); 
 		static void Interact();
+		static void SetEnemies();
+		static void MoveEnemies();
+		static void fight();
 		static void DrawAction();
 		static void DrawWeapon();
+		static void DrawEnemies();
 		static void Draw();
 		static void HandleEvent();
 		static void UpdateView();

@@ -50,7 +50,7 @@ void Controller::SettingsView::ActiveTab(sf::RenderWindow& rt){
 		if (tabs[i].getGlobalBounds().contains(mp)) {
 			// reset colors
 			tabs[activeTab].setFillColor(sf::Color(200, 200, 200));
-			activeTab = i;
+			activeTab = static_cast<int>(i);
 			tabs[activeTab].setFillColor(sf::Color(100, 100, 250));
 			page = Tab(activeTab-1);
 			break;
@@ -150,7 +150,7 @@ void Controller::SettingsView::Draw(sf::RenderTarget& rt){
 void Controller::SettingsView::Save(){
 	DB^ model = gcnew DB();
 
-	model->resolutionIndex = resolution.currentIndex;
+	model->resolutionIndex = static_cast<int>(resolution.currentIndex);
 	model->musicValue = Music1.getValue();
 	int count = static_cast<int>(Key.size());
 	model->keyBindings = gcnew List<System::String^>();
@@ -371,11 +371,12 @@ void Controller::Window::Setup(){
 		{sf::Keyboard::Key::Left,  "Left"},
 		{sf::Keyboard::Key::Right, "Right"},
 		{sf::Keyboard::Key::Up,    "Up"},
-		{sf::Keyboard::Key::Down,  "Down"},
+		{sf::Keyboard::Key::Down,  "Down"}
 	};
 
 	MouseLabel = {
-		{sf::Mouse::Button::Left, "Left Click"},{sf::Mouse::Button::Right,"Right Click"},{sf::Mouse::Button::Middle, "Middle Click"},
+		{sf::Mouse::Button::Left, "Left Click"},{sf::Mouse::Button::Right,"Right Click"},
+		{sf::Mouse::Button::Middle, "Middle Click"}
 	};
 }
 
@@ -449,11 +450,12 @@ string Controller::Window::keyToString(sf::Keyboard::Key key){
 
 sf::Keyboard::Key Controller::Window::StringToKey(string s)
 {
-	for (auto it : KeyLabel) {
+	for (auto& it : KeyLabel) {
 		if (it.second == s) {
 			return it.first;
 		}
 	}
+	return sf::Keyboard::Key::Unknown;
 }
 
 string Controller::Window::clickToString(sf::Mouse::Button click){
@@ -463,11 +465,12 @@ string Controller::Window::clickToString(sf::Mouse::Button click){
 
 sf::Mouse::Button Controller::Window::StringToClick(string s)
 {
-	for (auto it : MouseLabel) {
+	for (auto& it : MouseLabel) {
 		if (it.second == s) {
 			return it.first;
 		}
 	}
+	return sf::Mouse::Button::Extra1;
 }
 
 bool Controller::Window::Click(){
@@ -585,9 +588,7 @@ bool Controller::Mision::Accept(sf::Vector2f mp){
 	if (acceptButton.getGlobalBounds().contains(mp)) {
 		return true;
 	}
-	else {
-		return false;
-	}
+	return false;
 }
 
 void Controller::GameView::Setup() {
@@ -608,8 +609,9 @@ void Controller::GameView::Setup() {
 			Window::Y / 4.f + static_cast<float>(i) * 80.f
 			});
 	}
-	mapT.loadFromFile("./External/PLACEHOLDERS/testmap.png");
-	map.setTexture(&mapT);
+	if (mapT.loadFromFile("./External/PLACEHOLDERS/testmap.png")) {
+		map.setTexture(&mapT);
+	};
 	//Set starting point in map and proper scale, 
 	//map.setTextureRect(sf::IntRect({ mapT.getSize().x / 2.f,mapT.getSize().y / 2.f }, { 500,500 }));
 	//Set size and scale
@@ -625,7 +627,12 @@ void Controller::GameView::Setup() {
 		Icon t(actionT[i], SettingsView::textKey[4 + i]);
 		action.push_back(t);
 	}
+	//Healthbar
+	Healthbar.setMax(p.Health);
+	Healthbar.setValue(p.Health);
+	//deploy and move weapons
 	for (int i = 0; i < 4; i++) {
+		//add rand and switch weapon type later
 		weapon.emplace_back(make_unique<Weapons::Pistol>());
 	}
 	for (auto& e : weapon) {
@@ -639,7 +646,7 @@ void Controller::GameView::UpdateAction(){
 	sf::Vector2f center = GameView::View.getCenter();
 	sf::Vector2f pos = center + size * 0.5f - sf::Vector2f(600, 100);
 	for (size_t i = 0; i < action.size(); i++) {
-		action[i].move(pos + sf::Vector2f(i * 150, 0.f));
+		action[i].move(pos + sf::Vector2f(static_cast<float>(i) * 150.f, 0.f));
 	}
 }
 
@@ -660,6 +667,75 @@ void Controller::GameView::Interact(){
 	weapon.erase(remove(weapon.begin(), weapon.end(), nullptr), weapon.end());
 }
 
+void Controller::GameView::SetEnemies(){
+	if (wave.gettime() >= spawnrate) {
+		for (int i = 0; i < spawnrate/5; i++) {
+			sf::Vector2f pos({ 
+				(float)(rand() % (Window::X*2)) - Window::X + p.getPosition().x,
+				(float)(rand() % (Window::Y*2)) - Window::Y + p.getPosition().y});
+			enemy.emplace_back(make_unique<Enemies::DOPPIO>(Enemies::DV4, pos));
+		}
+		spawnrate += 5;
+	}
+}
+
+void Controller::GameView::MoveEnemies(){
+	sf::Vector2f vector;
+	double pi = 3.14159;
+	float r = static_cast<float>(pi) / 180;
+	if (wave.gettime() > 5) {
+		for (auto& e : enemy) {
+			if (!e->timer.isRunning()) {
+				e->timer.start();
+			}
+			if (e->vision.getGlobalBounds().findIntersection(p.hitbox.getGlobalBounds())) {
+				vector = p.getPosition() - e->position;
+				e->direction = atan2(vector.y, vector.x);
+			}
+			else if (!e->area.getGlobalBounds().contains(e->position)){
+				e->center = true;
+				vector = e->area.getPosition() - e->position;
+				e->direction = atan2(vector.y, vector.x);
+			}
+			else if (e->spawn.getGlobalBounds().contains(e->position) && e->center == true) {
+				float a = ((rand() / 360.f)-180.f) * r;
+				e->direction = a;
+				e->center = false;
+			}
+			e->move();
+		}
+	}
+}
+
+void Controller::GameView::fight(){
+	for (auto& e : enemy) {
+		for (auto& w : p.weapon) {
+			if (e->hitbox.getGlobalBounds().findIntersection(w->ammo.getGlobalBounds())) {
+				if (w->Hit()) {
+					e->Health -= (int) w->dmg;
+					w->shoot = false;
+				}
+			}
+			if (e->hitbox.getGlobalBounds().findIntersection(p.hitbox.getGlobalBounds())) {
+				if (!p.invulnerable) {
+					p.Health -= (int) e->dmg;
+					Healthbar.setValue(p.Health);
+					p.invulnerable = true;
+					p.Timer.restart();
+				}
+				else if (p.Timer.getElapsedTime().asMilliseconds() >= 300) {
+					p.Timer.reset();
+					p.invulnerable = false;
+				}
+			}
+			if (e->Health <= 0) {
+				e.release();
+			}
+		}
+	}
+	enemy.erase(remove(enemy.begin(), enemy.end(), nullptr), enemy.end());
+}
+
 void Controller::GameView::DrawAction(){
 	for (size_t i = 0; i < action.size(); i++) {
 		action[i].draw();
@@ -669,6 +745,12 @@ void Controller::GameView::DrawAction(){
 void Controller::GameView::DrawWeapon(){
 	for (auto& e : weapon) {
 		e->Draw(Controller::Window::window);
+	}
+}
+
+void Controller::GameView::DrawEnemies(){
+	for (auto& e : enemy) {
+		e->draw(Controller::Window::window);
 	}
 }
 
@@ -689,9 +771,11 @@ void Controller::GameView::Draw(){
 		wave.draw();
 		DrawAction();
 		DrawWeapon();
+		DrawEnemies();
 		Window::window.setView(minimap);
 		Window::window.draw(map);
 		p.Draw();
+		DrawEnemies();
 		break;
 	}
 }
@@ -730,6 +814,9 @@ void Controller::GameView::HandleEvent(){
 		wave.update();
 		UpdateAction();
 		Interact();
+		SetEnemies();
+		MoveEnemies();
+		fight();
 		p.move();
 		p.Aim(mp);
 		p.Shoot();
@@ -799,7 +886,7 @@ void Controller::Slider::updateText(){
 }
 
 int Controller::Slider::getValue(){
-	value = ((thumb.getPosition().x - bar.getPosition().x) / (bar.getSize().x - thumb.getSize().x) * 100 + 0.5f);
+	value = static_cast<int>((thumb.getPosition().x - bar.getPosition().x) / (bar.getSize().x - thumb.getSize().x) * 100.f + 0.5f);
 	return value;
 }
 
@@ -838,11 +925,13 @@ Controller::Player::Player(){
 	Exp = 0;
 	Level = 0;
 	a1 = Animation("./External/PLACEHOLDERS/KASS-STB.png", { 0,0 },{500,{500}});
-	tex.loadFromFile("./External/PLACEHOLDERS/KASS-STB.png");
-	ds = DirectionalSprite(tex);
+	if (tex.loadFromFile("./External/PLACEHOLDERS/KASS-STB.png")) {
+		ds = DirectionalSprite(tex);
+	};
 	ds.setScale({ 0.1f,0.1f });
 	hitbox.setSize({ 100,120 });
 	hitbox.setOrigin({ 50,60 });
+	Timer.reset();
 }
 
 sf::Vector2f Controller::Player::getPosition(){
@@ -918,7 +1007,7 @@ Controller::DirectionalSprite::DirectionalSprite(sf::Texture& tex){
 		}};
 
 	for (int i = 0; i < 8; ++i) {
-		auto [c, r] = sheetPos[i];
+		auto& [c, r] = sheetPos[i];
 		rects[Dir(i)] = sf::IntRect(
 			{ c * frameW,r * frameH },
 			{ frameW,frameH }
@@ -1004,8 +1093,12 @@ Controller::Timer::Timer(){
 	time.restart();
 	timeText.setFillColor(sf::Color::White);
 }
+float Controller::Timer::gettime()
+{
+	return time.getElapsedTime().asSeconds();
+}
 void Controller::Timer::update() {
-	int t = time.getElapsedTime().asSeconds();
+	int t = static_cast<int>(time.getElapsedTime().asSeconds());
 	int min, sec;
 	min = t / 60;
 	sec = t % 60;

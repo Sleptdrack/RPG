@@ -34,6 +34,7 @@ Weapons::Pistol::Pistol(){
 	ammo.setOrigin({ -75,25 });
 	range.setOrigin({ range.getRadius(),range.getRadius() });
 	gun.setTexture(&pistol);
+	dmg = 50;
 }
 
 void Weapons::Pistol::Draw(sf::RenderWindow& rw) {

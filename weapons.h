@@ -23,13 +23,17 @@ namespace Weapons {
 	class Weapon {
 	public:
 		sf::RectangleShape gun = sf::RectangleShape({ 50,50 });
+		sf::RectangleShape ammo = sf::RectangleShape({ 50,50 });
+		float dmg;
 		sf::Vector2f center;
 		bool pickup = false;
+		bool shoot = false;
 	public:
 		Weapon();
 		virtual void Draw(sf::RenderWindow& rw);
 		virtual void move(sf::Vector2f pos);
 		virtual void followMouse(sf::Vector2f mp);
+		virtual bool Hit() { return shoot; };
 		virtual void primary() {};
 		virtual void secundary() {};
 	};
@@ -38,10 +42,8 @@ namespace Weapons {
 		int MagazineSize = 10;
 		int Magazine = 10;
 		sf::CircleShape range = sf::CircleShape(500.f);
-		sf::RectangleShape ammo = sf::RectangleShape({ 50,50 });
 		sf::Clock timer;
-		float speed = 500.f;
-		bool shoot = false;
+		float speed = 1000.f;
 		bool pickup = false;
 	public:
 		Pistol();

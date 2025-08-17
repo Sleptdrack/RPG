@@ -2,6 +2,7 @@
 #include "Controller.h"
 
 int main(){
+    srand(static_cast<unsigned int>(time(static_cast<time_t>(0))));
     Controller::SettingsView::Setup();
     Controller::TitleView::SetupMenu();
     Controller::Window::Setup();
