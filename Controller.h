@@ -171,7 +171,7 @@ namespace Controller {
 		sf::Clock Timer;
 	public:
 		Player();
-		sf::Vector2f getPosition();
+		sf::Vector2f getPosition() const;
 		void move();
 		void Draw();
 		void Aim(sf::Vector2f mp);
@@ -219,8 +219,8 @@ namespace Controller {
 		void Draw();
 		void SetPos(sf::Vector2f pos);
 		void SetDesPos(sf::Vector2f pos);
-		bool Open(sf::Vector2f mp);
-		bool Accept(sf::Vector2f mp);
+		bool Open(sf::Vector2f mp) const;
+		bool Accept(sf::Vector2f mp) const;
 	};
 	class SettingsView : public IView {
 	public:

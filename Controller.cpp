@@ -576,7 +576,8 @@ void Controller::Mision::SetDesPos(sf::Vector2f pos){
 	centerLabel(acceptLabel, acceptButton.getGlobalBounds());
 }
 
-bool Controller::Mision::Open(sf::Vector2f mp){
+
+bool Controller::Mision::Open(sf::Vector2f mp) const{
 	if (Name.getGlobalBounds().contains(mp)) {
 		return true;
 	}
@@ -584,7 +585,7 @@ bool Controller::Mision::Open(sf::Vector2f mp){
 
 }
 
-bool Controller::Mision::Accept(sf::Vector2f mp){
+bool Controller::Mision::Accept(sf::Vector2f mp) const{
 	if (acceptButton.getGlobalBounds().contains(mp)) {
 		return true;
 	}
@@ -710,12 +711,14 @@ void Controller::GameView::MoveEnemies(){
 void Controller::GameView::fight(){
 	for (auto& e : enemy) {
 		for (auto& w : p.weapon) {
-			if (e->hitbox.getGlobalBounds().findIntersection(w->ammo.getGlobalBounds())) {
-				if (w->Hit()) {
-					e->Health -= (int) w->dmg;
-					w->shoot = false;
+			for (auto& ammo : w->mag){
+				if (e->hitbox.getGlobalBounds().findIntersection(ammo->hitbox.getGlobalBounds())) {
+					e->Health -= (int)w->dmg;
+					ammo.release();
 				}
 			}
+			w->mag.erase(remove(w->mag.begin(),w->mag.end(), nullptr), w->mag.end());
+			if(w->mag.empty())w->Reload();
 			if (e->hitbox.getGlobalBounds().findIntersection(p.hitbox.getGlobalBounds())) {
 				if (!p.invulnerable) {
 					p.Health -= (int) e->dmg;
@@ -934,7 +937,7 @@ Controller::Player::Player(){
 	Timer.reset();
 }
 
-sf::Vector2f Controller::Player::getPosition(){
+sf::Vector2f Controller::Player::getPosition() const{
 	return position;
 }
 
@@ -984,6 +987,10 @@ void Controller::Player::Shoot(){
 		if (Window::primary) {
 			e->primary();
 			Window::primary = false;
+		}
+		if (Window::secundary) {
+			e->secundary();
+			Window::secundary = false;
 		}
 	}
 }
